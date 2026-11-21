@@ -4,15 +4,23 @@ use super::palette::RAINBOW;
 use super::{Frame, Scene};
 
 /// An animated plasma made of overlapping sine waves.
-pub struct Plasma;
+#[derive(Default)]
+pub struct Plasma {
+    /// Time since the animation started: the sum of all update steps.
+    t: Duration,
+}
 
 impl Scene for Plasma {
     fn name(&self) -> &'static str {
         "Plasma"
     }
 
-    fn render(&self, dst: &mut Frame, t: Duration) {
-        let s = t.as_secs_f64();
+    fn update(&mut self, step: Duration) {
+        self.t += step;
+    }
+
+    fn render(&mut self, dst: &mut Frame) {
+        let s = self.t.as_secs_f64();
         // Integer halves first, as in the Go version.
         let cx = (dst.width() / 2) as f64;
         let cy = (dst.height() / 2) as f64;

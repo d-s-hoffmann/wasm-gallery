@@ -6,8 +6,6 @@
 
 mod scene;
 
-use std::time::Duration;
-
 use scene::{Frame, Plasma, Scene};
 use wasm_bindgen::{Clamped, prelude::*};
 use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
@@ -29,8 +27,8 @@ fn start() -> Result<(), JsValue> {
 
     let (w, h) = (canvas.width(), canvas.height());
     let mut frame = Frame::new(w as usize, h as usize);
-    let scene = Plasma;
-    scene.render(&mut frame, Duration::ZERO);
+    let mut scene = Plasma::default();
+    scene.render(&mut frame);
 
     // ImageData copies the bytes out of WASM memory into a new JS array.
     let img = ImageData::new_with_u8_clamped_array_and_sh(Clamped(frame.pix()), w, h)?;

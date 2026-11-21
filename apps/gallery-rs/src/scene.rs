@@ -50,16 +50,24 @@ impl Frame {
     }
 }
 
-/// A Scene draws one animation frame at a time.
+/// A Scene is an animation with state, driven in two phases.
 ///
-/// `render` must write every pixel of `dst` and must produce the same
-/// pixels for the same size and time. The size of `dst` may change
-/// between calls.
+/// [`update`](Scene::update) advances the state by one fixed time step;
+/// conditional logic belongs there. [`render`](Scene::render) draws the
+/// current state and must not change what later frames look like. After
+/// the same sequence of updates, a scene must produce the same pixels for
+/// the same frame size, so frames are reproducible.
 pub trait Scene {
     /// A short human-readable label, e.g. for a menu entry.
     #[expect(dead_code, reason = "read by the scene menu, a later step")]
     fn name(&self) -> &'static str;
 
-    /// Draws the frame at time `t`, measured from the animation start.
-    fn render(&self, dst: &mut Frame, t: Duration);
+    /// Advances the animation by `step`, which the caller keeps constant.
+    #[expect(dead_code, reason = "called by the animation loop, next commit")]
+    fn update(&mut self, step: Duration);
+
+    /// Draws the current state into `dst`, writing every pixel. The size
+    /// of `dst` may change between calls. It takes `&mut self` so scenes
+    /// can keep scratch buffers between frames.
+    fn render(&mut self, dst: &mut Frame);
 }
