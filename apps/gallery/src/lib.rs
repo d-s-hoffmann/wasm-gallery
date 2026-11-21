@@ -2,10 +2,13 @@
 //!
 //! This file only wires modules together: scenes come from [`scene`], the
 //! fixed-step timing from [`clock`], and everything that talks to the
-//! browser lives in [`ui`].
+//! browser lives in [`ui`]. [`tiling`] and [`pathfinding`] are the boards
+//! and algorithms of the path-finding scene.
 
 mod clock;
+mod pathfinding;
 mod scene;
+mod tiling;
 mod ui;
 
 use std::cell::Cell;
@@ -13,7 +16,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use clock::Clock;
-use scene::{Julia, Lissajous, Plasma, Scene, View};
+use scene::{Julia, Lissajous, PathSearch, Plasma, Scene, View};
 use wasm_bindgen::prelude::*;
 
 /// Length of one update step: 120 updates per second.
@@ -53,6 +56,7 @@ fn start() -> Result<(), JsValue> {
         Box::new(Plasma::default()),
         Box::new(Julia::default()),
         Box::new(Lissajous::default()),
+        Box::new(PathSearch::default()),
     ];
     let settings = Rc::new(Cell::new(Settings {
         scene: 0,
