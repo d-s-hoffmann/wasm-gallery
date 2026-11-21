@@ -5,7 +5,9 @@
 mod animate;
 mod buttons;
 mod canvas;
+mod slider;
 
 pub use animate::animate;
 pub use buttons::buttons;
 pub use canvas::Canvas;
+pub use slider::{Slider, slider};

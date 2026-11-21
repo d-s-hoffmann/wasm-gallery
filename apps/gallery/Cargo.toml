@@ -20,6 +20,7 @@ features = [
     "Element",
     "EventTarget",
     "HtmlCanvasElement",
+    "HtmlInputElement",
     "ImageData",
     "Node",
     "Window",

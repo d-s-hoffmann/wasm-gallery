@@ -9,10 +9,12 @@ mod julia;
 mod lissajous;
 mod palette;
 mod plasma;
+mod view;
 
 pub use julia::Julia;
 pub use lissajous::Lissajous;
 pub use plasma::Plasma;
+pub use view::View;
 
 /// An RGBA image, four bytes per pixel, rows top to bottom.
 pub struct Frame {
@@ -29,6 +31,15 @@ impl Frame {
             height,
             pix: vec![0; width * height * 4],
         }
+    }
+
+    /// Changes the size of the frame. It keeps its allocation and only
+    /// grows it when needed, so switching between sizes stops allocating.
+    /// Pixel contents are left over from before; scenes redraw them all.
+    pub fn resize(&mut self, width: usize, height: usize) {
+        self.width = width;
+        self.height = height;
+        self.pix.resize(width * height * 4, 0);
     }
 
     pub fn width(&self) -> usize {
@@ -60,7 +71,7 @@ impl Frame {
 /// conditional logic belongs there. [`render`](Scene::render) draws the
 /// current state and must not change what later frames look like. After
 /// the same sequence of updates, a scene must produce the same pixels for
-/// the same frame size, so frames are reproducible.
+/// the same frame size and view, so frames are reproducible.
 pub trait Scene {
     /// A short human-readable label, e.g. for a menu entry.
     fn name(&self) -> &'static str;
@@ -68,8 +79,9 @@ pub trait Scene {
     /// Advances the animation by `step`, which the caller keeps constant.
     fn update(&mut self, step: Duration);
 
-    /// Draws the current state into `dst`, writing every pixel. The size
-    /// of `dst` may change between calls. It takes `&mut self` so scenes
-    /// can keep scratch buffers between frames.
-    fn render(&mut self, dst: &mut Frame);
+    /// Draws the current state into `dst` as seen through `view`, writing
+    /// every pixel. Positions come from [`View::mapping`], never from pixel
+    /// indices directly. The size of `dst` may change between calls. It
+    /// takes `&mut self` so scenes can keep scratch buffers between frames.
+    fn render(&mut self, dst: &mut Frame, view: &View);
 }
