@@ -24,12 +24,31 @@
     display: block;
     image-rendering: pixelated;
   }
-  /* The menu floats above the view, clear of notches and rounded corners. */
+  /* The menu floats above the view, clear of notches and rounded corners.
+     It is a <details> element, so the browser opens and closes it; closed,
+     only the small button (its <summary>) is left. */
   #menu {
     position: fixed;
     top: max(12px, env(safe-area-inset-top));
     left: max(12px, env(safe-area-inset-left));
     max-width: calc(100vw - 24px);
+  }
+  #menu > summary {
+    list-style: none; /* hide the default triangle */
+    width: 2.5rem;
+    height: 2.5rem;
+    display: grid;
+    place-items: center;
+    font-size: 1.25rem;
+    cursor: pointer;
+    background: rgba(11, 9, 32, 0.75);
+    backdrop-filter: blur(6px);
+    border: 1px solid #34266f;
+    border-radius: 10px;
+  }
+  #menu > summary::-webkit-details-marker { display: none; }
+  .panel {
+    margin-top: 0.5rem;
     padding: 0.75rem 1rem;
     background: rgba(11, 9, 32, 0.75);
     backdrop-filter: blur(6px);
@@ -53,11 +72,14 @@
 </head>
 <body>
 <canvas id="stage"></canvas>
-<nav id="menu">
-  <h1>WebAssembly Gallery</h1>
-  <p class="sub">Renderer and UI compiled to WebAssembly — no application JavaScript.</p>
-  <div id="controls"></div>
-</nav>
+<details id="menu" open>
+  <summary aria-label="Menu">☰</summary>
+  <nav class="panel">
+    <h1>WebAssembly Gallery</h1>
+    <p class="sub">Renderer and UI compiled to WebAssembly — no application JavaScript.</p>
+    <div id="controls"></div>
+  </nav>
+</details>
 <script type="module" src="load.js"></script>
 </body>
 </html>
