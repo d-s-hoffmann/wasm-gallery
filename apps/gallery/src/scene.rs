@@ -33,6 +33,15 @@ impl Frame {
         }
     }
 
+    /// Changes the size of the frame. It keeps its allocation and only
+    /// grows it when needed, so switching between sizes stops allocating.
+    /// Pixel contents are left over from before; scenes redraw them all.
+    pub fn resize(&mut self, width: usize, height: usize) {
+        self.width = width;
+        self.height = height;
+        self.pix.resize(width * height * 4, 0);
+    }
+
     pub fn width(&self) -> usize {
         self.width
     }

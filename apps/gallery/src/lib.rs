@@ -19,13 +19,17 @@ use wasm_bindgen::prelude::*;
 /// Length of one update step: 120 updates per second.
 const STEP: Duration = Duration::from_nanos(1_000_000_000 / 120);
 
+/// Most pixels a frame may have. A bigger screen gets more pixels up to
+/// this budget, then bigger pixels. About 2.5 times the old 320×200 view.
+const MAX_PIXELS: usize = 160_000;
+
 /// The most time the loop catches up on after a slow frame or a hidden tab.
 const MAX_LAG: Duration = Duration::from_millis(250);
 
 /// Runs once, as soon as the module is instantiated.
 #[wasm_bindgen(start)]
 fn start() -> Result<(), JsValue> {
-    let mut canvas = ui::Canvas::new("stage")?;
+    let mut canvas = ui::Canvas::new("stage", MAX_PIXELS)?;
 
     let mut scenes: Vec<Box<dyn Scene>> = vec![
         Box::new(Plasma::default()),
@@ -46,6 +50,7 @@ fn start() -> Result<(), JsValue> {
         for _ in 0..clock.advance(now) {
             scene.update(STEP);
         }
+        canvas.fit();
         scene.render(canvas.frame_mut(), &view);
         canvas.present()
     })
