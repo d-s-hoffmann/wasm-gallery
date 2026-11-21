@@ -1,36 +1,51 @@
 //! Browser client of the Rust gallery.
 //!
-//! For now it draws a single still frame of the Plasma scene onto the
-//! `#stage` canvas. Scenes live in [`scene`] and know nothing about the
-//! browser; only this file talks to it.
+//! This file only wires modules together: scenes come from [`scene`], the
+//! fixed-step timing from [`clock`], and everything that talks to the
+//! browser lives in [`ui`].
 
+mod clock;
 mod scene;
+mod ui;
 
-use scene::{Frame, Plasma, Scene};
-use wasm_bindgen::{Clamped, prelude::*};
-use web_sys::{CanvasRenderingContext2d, HtmlCanvasElement, ImageData};
+use std::cell::Cell;
+use std::rc::Rc;
+use std::time::Duration;
+
+use clock::Clock;
+use scene::{Julia, Lissajous, Plasma, Scene};
+use wasm_bindgen::prelude::*;
+
+/// Length of one update step: 120 updates per second.
+const STEP: Duration = Duration::from_nanos(1_000_000_000 / 120);
+
+/// The most time the loop catches up on after a slow frame or a hidden tab.
+const MAX_LAG: Duration = Duration::from_millis(250);
 
 /// Runs once, as soon as the module is instantiated.
 #[wasm_bindgen(start)]
 fn start() -> Result<(), JsValue> {
-    let document = web_sys::window()
-        .and_then(|w| w.document())
-        .ok_or("no document")?;
-    let canvas: HtmlCanvasElement = document
-        .get_element_by_id("stage")
-        .ok_or("no canvas with id \"stage\"")?
-        .dyn_into()?;
-    let ctx: CanvasRenderingContext2d = canvas
-        .get_context("2d")?
-        .ok_or("canvas has no 2d context")?
-        .dyn_into()?;
+    let mut canvas = ui::Canvas::new("stage")?;
 
-    let (w, h) = (canvas.width(), canvas.height());
-    let mut frame = Frame::new(w as usize, h as usize);
-    let mut scene = Plasma::default();
-    scene.render(&mut frame);
+    let mut scenes: Vec<Box<dyn Scene>> = vec![
+        Box::new(Plasma::default()),
+        Box::new(Julia::default()),
+        Box::new(Lissajous::default()),
+    ];
+    // Index of the shown scene, shared by the buttons and the loop.
+    let current = Rc::new(Cell::new(0));
 
-    // ImageData copies the bytes out of WASM memory into a new JS array.
-    let img = ImageData::new_with_u8_clamped_array_and_sh(Clamped(frame.pix()), w, h)?;
-    ctx.put_image_data(&img, 0.0, 0.0)
+    let names: Vec<_> = scenes.iter().map(|s| s.name()).collect();
+    let select = Rc::clone(&current);
+    ui::buttons("controls", &names, move |i| select.set(i))?;
+
+    let mut clock = Clock::new(STEP, MAX_LAG);
+    ui::animate(move |now| {
+        let scene = &mut scenes[current.get()];
+        for _ in 0..clock.advance(now) {
+            scene.update(STEP);
+        }
+        scene.render(canvas.frame_mut());
+        canvas.present()
+    })
 }

@@ -5,9 +5,13 @@
 
 use std::time::Duration;
 
+mod julia;
+mod lissajous;
 mod palette;
 mod plasma;
 
+pub use julia::Julia;
+pub use lissajous::Lissajous;
 pub use plasma::Plasma;
 
 /// An RGBA image, four bytes per pixel, rows top to bottom.
@@ -59,11 +63,9 @@ impl Frame {
 /// the same frame size, so frames are reproducible.
 pub trait Scene {
     /// A short human-readable label, e.g. for a menu entry.
-    #[expect(dead_code, reason = "read by the scene menu, a later step")]
     fn name(&self) -> &'static str;
 
     /// Advances the animation by `step`, which the caller keeps constant.
-    #[expect(dead_code, reason = "called by the animation loop, next commit")]
     fn update(&mut self, step: Duration);
 
     /// Draws the current state into `dst`, writing every pixel. The size
