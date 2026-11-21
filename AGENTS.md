@@ -20,13 +20,12 @@ Good structure is the top priority.
   the toolchain pinned in rust-toolchain.toml. Commit Cargo.lock.
 
 ## Layout
-- `apps/<name>/`: one deployable program each. Keep `main` thin; packages
-  only that app uses go in subfolders (e.g. `apps/gallery/scene/`).
-- Rust apps are crates named `apps/<name>-rs/` while a Go version exists.
+- `apps/<name>/`: one deployable program each. Keep `main` (or `lib.rs`)
+  thin; code only that app uses goes in subfolders (e.g. Go packages in
+  `apps/server/<pkg>/`, Rust modules in `apps/gallery/src/scene/`).
 - Rendering code must not touch browser APIs: no `web-sys` or
   `wasm-bindgen`.
-- `static/`: hand-written web files; `static/<go|rust>/` holds per-client
-  files. `build/`: generated, never committed.
+- `static/`: hand-written web files. `build/`: generated, never committed.
 
 ## UI
 - The menu is separate from the view and collapses to a small button.

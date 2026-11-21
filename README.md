@@ -47,15 +47,14 @@ only JavaScript is toolchain-generated glue plus a few-line loader.
 
 Go downloads the exact version from `go.mod` by itself if the installed one
 is older. Likewise, rustup installs the Rust version and wasm target pinned in
-`apps/gallery-rs/rust-toolchain.toml` on the first build. The wasm-bindgen
-CLI version must match `apps/gallery-rs/Cargo.toml`.
+`apps/gallery/rust-toolchain.toml` on the first build. The wasm-bindgen
+CLI version must match `apps/gallery/Cargo.toml`.
 
 ## Layout
 
-    apps/gallery-rs/            Rust WASM client (wasm32-unknown-unknown)
-    apps/gallery-rs/src/scene/  scenes and their frame buffer; no browser APIs
-    apps/gallery-rs/src/ui/     browser glue: canvas, animation loop, controls
-    apps/server/                development file server (Go)
-    static/                     hand-written page
-    static/rust/                the client's loader, copied next to the page
-    build/                      generated output, not committed
+    apps/gallery/            Rust WASM client (wasm32-unknown-unknown)
+    apps/gallery/src/scene/  scenes and their frame buffer; no browser APIs
+    apps/gallery/src/ui/     browser glue: canvas, animation loop, controls
+    apps/server/             development file server (Go)
+    static/                  hand-written page and its few-line loader
+    build/                   generated output, not committed
