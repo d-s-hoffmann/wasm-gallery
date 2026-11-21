@@ -23,5 +23,6 @@ features = [
     "HtmlInputElement",
     "ImageData",
     "Node",
+    "Performance",
     "Window",
 ]
