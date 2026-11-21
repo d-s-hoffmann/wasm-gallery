@@ -13,7 +13,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use clock::Clock;
-use scene::{Julia, Lissajous, Plasma, Scene};
+use scene::{Julia, Lissajous, Plasma, Scene, View};
 use wasm_bindgen::prelude::*;
 
 /// Length of one update step: 120 updates per second.
@@ -39,13 +39,14 @@ fn start() -> Result<(), JsValue> {
     let select = Rc::clone(&current);
     ui::buttons("controls", &names, move |i| select.set(i))?;
 
+    let view = View::default();
     let mut clock = Clock::new(STEP, MAX_LAG);
     ui::animate(move |now| {
         let scene = &mut scenes[current.get()];
         for _ in 0..clock.advance(now) {
             scene.update(STEP);
         }
-        scene.render(canvas.frame_mut());
+        scene.render(canvas.frame_mut(), &view);
         canvas.present()
     })
 }

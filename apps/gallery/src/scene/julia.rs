@@ -1,10 +1,13 @@
 use std::time::Duration;
 
 use super::palette::{RAINBOW, Rgba};
-use super::{Frame, Scene};
+use super::{Frame, Scene, View};
 
 /// Escape-time iteration limit.
 const MAX_ITER: u32 = 60;
+
+/// Half the extent of the complex plane across the frame's shorter side.
+const EXTENT: f64 = 1.3;
 
 /// Colour of points that never escape.
 const INSIDE: Rgba = [12, 9, 36, 255];
@@ -25,20 +28,16 @@ impl Scene for Julia {
         self.t += step;
     }
 
-    fn render(&mut self, dst: &mut Frame) {
+    fn render(&mut self, dst: &mut Frame, view: &View) {
         let (sin, cos) = (self.t.as_secs_f64() * 0.15).sin_cos();
         let (cr, ci) = (cos * 0.7885, sin * 0.7885);
 
-        let (w, h) = (dst.width() as f64, dst.height() as f64);
-        // Integer halves first, as in the Go version.
-        let half_w = (dst.width() / 2) as f64;
-        let half_h = (dst.height() / 2) as f64;
+        let map = view.mapping(dst.width(), dst.height());
         for (y, row) in dst.rows_mut() {
-            let zy = (y as f64 - half_h) / (h / 2.6);
             let (pixels, _) = row.as_chunks_mut::<4>();
             for (x, px) in pixels.iter_mut().enumerate() {
-                let zx = (x as f64 - half_w) / (w / 3.2);
-                *px = color(escape(zx, zy, cr, ci));
+                let (u, v) = map.to_scene(x, y);
+                *px = color(escape(u * EXTENT, v * EXTENT, cr, ci));
             }
         }
     }

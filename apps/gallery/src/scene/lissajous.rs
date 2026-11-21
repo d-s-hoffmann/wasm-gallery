@@ -2,14 +2,14 @@ use std::f64::consts::TAU;
 use std::time::Duration;
 
 use super::palette::Rgba;
-use super::{Frame, Scene};
+use super::{Frame, Scene, View};
 
 /// Line segments per curve.
 const STEPS: u32 = 1400;
-/// Distance of the curve's extremes from the edge, in pixels.
-const MARGIN: f64 = 6.0;
-/// Stroke width, in pixels.
-const WIDTH: f64 = 1.5;
+/// Amplitude of the curve, in scene units; 1 would touch the shorter edge.
+const AMPLITUDE: f64 = 0.94;
+/// Stroke width, in scene units.
+const WIDTH: f64 = 0.015;
 
 const BACKGROUND: Rgba = [0x0b, 0x09, 0x20, 0xff];
 const STROKE: Rgba = [0x8f, 0x6b, 0xff, 0xff];
@@ -33,7 +33,7 @@ impl Scene for Lissajous {
         self.t += step;
     }
 
-    fn render(&mut self, dst: &mut Frame) {
+    fn render(&mut self, dst: &mut Frame, view: &View) {
         let (w, h) = (dst.width(), dst.height());
         if w == 0 || h == 0 {
             return;
@@ -43,19 +43,19 @@ impl Scene for Lissajous {
         self.cov.resize(w * h, 0.0);
 
         let s = self.t.as_secs_f64();
-        let (cx, cy) = (w as f64 / 2.0, h as f64 / 2.0);
-        let (ax, ay) = (cx - MARGIN, cy - MARGIN);
+        let map = view.mapping(w, h);
         let point = |i: u32| {
             let u = TAU * f64::from(i) / f64::from(STEPS);
-            (
-                cx + ax * (3.0 * u + s * 0.9).sin(),
-                cy + ay * (4.0 * u).sin(),
-            )
+            map.to_pixel((
+                AMPLITUDE * (3.0 * u + s * 0.9).sin(),
+                AMPLITUDE * (4.0 * u).sin(),
+            ))
         };
+        let radius = WIDTH / 2.0 * map.unit();
         let mut p0 = point(0);
         for i in 1..=STEPS {
             let p1 = point(i);
-            stroke_segment(&mut self.cov, w, h, p0, p1, WIDTH / 2.0);
+            stroke_segment(&mut self.cov, w, h, p0, p1, radius);
             p0 = p1;
         }
 
