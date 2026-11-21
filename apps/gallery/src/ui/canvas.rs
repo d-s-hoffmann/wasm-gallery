@@ -10,14 +10,11 @@ pub struct Canvas {
     canvas: HtmlCanvasElement,
     ctx: CanvasRenderingContext2d,
     frame: Frame,
-    /// Most pixels a frame may have.
-    max_pixels: usize,
 }
 
 impl Canvas {
-    /// Returns a Canvas for the `<canvas>` element with the given id. Its
-    /// frames have at most `max_pixels` pixels.
-    pub fn new(id: &str, max_pixels: usize) -> Result<Self, JsValue> {
+    /// Returns a Canvas for the `<canvas>` element with the given id.
+    pub fn new(id: &str) -> Result<Self, JsValue> {
         let window = web_sys::window().ok_or("no window")?;
         let document = window.document().ok_or("no document")?;
         let canvas: HtmlCanvasElement = document
@@ -28,26 +25,25 @@ impl Canvas {
             .get_context("2d")?
             .ok_or("canvas has no 2d context")?
             .dyn_into()?;
-        let mut c = Self {
+        // Empty until the first fit, which comes before the first present.
+        Ok(Self {
             window,
             canvas,
             ctx,
             frame: Frame::new(0, 0),
-            max_pixels,
-        };
-        c.fit();
-        Ok(c)
+        })
     }
 
     /// Resizes the frame and the canvas's pixel buffer if the canvas's
     /// displayed size changed, e.g. after a window resize or a phone
-    /// rotation. Call it before drawing each frame.
-    pub fn fit(&mut self) {
+    /// rotation, or if `max_pixels`, the most pixels a frame may have,
+    /// changed. Call it before drawing each frame.
+    pub fn fit(&mut self, max_pixels: usize) {
         let css = (
             f64::from(self.canvas.client_width()),
             f64::from(self.canvas.client_height()),
         );
-        let (w, h) = render_size(css, self.window.device_pixel_ratio(), self.max_pixels);
+        let (w, h) = render_size(css, self.window.device_pixel_ratio(), max_pixels);
         if (w, h) != (self.frame.width(), self.frame.height()) {
             // Setting the buffer size clears the canvas, so only do it on
             // a change. CSS stretches the buffer to the displayed size.
