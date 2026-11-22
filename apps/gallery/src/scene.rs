@@ -57,6 +57,11 @@ impl Frame {
         &self.pix
     }
 
+    /// All pixels, row by row, for writing.
+    pub fn pixels_mut(&mut self) -> &mut [[u8; 4]] {
+        self.pix.as_chunks_mut::<4>().0
+    }
+
     /// Yields each row's index and its pixel bytes, for writing.
     pub fn rows_mut(&mut self) -> impl Iterator<Item = (usize, &mut [u8])> {
         // max(1): chunks_exact_mut panics on 0, and a 0-wide frame has no

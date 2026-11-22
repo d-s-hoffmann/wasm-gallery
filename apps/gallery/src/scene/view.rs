@@ -57,6 +57,20 @@ impl Mapping {
         (x * self.unit + self.cx, y * self.unit + self.cy)
     }
 
+    /// Returns this mapping adjusted so that `len` scene units span a
+    /// whole number of pixels, at least one, and the scene origin lies on
+    /// a pixel corner. Lines at multiples of `len` from the origin, such as
+    /// the edges of a grid of cells of side `len`, then fall on pixel
+    /// edges: every cell gets the same number of pixels at any resolution.
+    /// It rounds down, so everything visible before stays visible.
+    pub fn snapped(self, len: f64) -> Self {
+        Self {
+            cx: self.cx.floor(),
+            cy: self.cy.floor(),
+            unit: (len * self.unit).floor().max(1.0) / len,
+        }
+    }
+
     /// Returns the number of pixels per scene unit.
     pub fn unit(&self) -> f64 {
         self.unit
