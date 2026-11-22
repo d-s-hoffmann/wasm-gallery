@@ -4,8 +4,10 @@
 //! Plain Rust with no browser API.
 
 mod bfs;
+mod dijkstra;
 
 pub use bfs::Bfs;
+pub use dijkstra::Dijkstra;
 
 use crate::tiling::Tiling;
 

@@ -3,7 +3,7 @@ use std::time::Duration;
 use super::noise::{self, Rng};
 use super::palette::Rgba;
 use super::{Frame, Scene, View};
-use crate::pathfinding::{Bfs, Mark, Search, Status};
+use crate::pathfinding::{Bfs, Dijkstra, Mark, Search, Status};
 use crate::tiling::{Square, Tiling};
 
 /// Cells across the shorter side of the view; the longer side gets as
@@ -18,26 +18,85 @@ const WALLS: f64 = 0.3;
 /// in cells.
 const BLOB: f64 = 9.0;
 const DETAIL: f64 = 3.0;
+/// Number of terrain bands, the cost of entering a floor cell of each
+/// band, as a factor on the step's length, and the rough width of a
+/// patch of one band, in cells.
+const BANDS: usize = 4;
+const COSTS: [f64; BANDS] = [1.0, 2.0, 4.0, 8.0];
+const PATCH: f64 = 6.0;
 /// Cells expanded per update: 240 a second at 120 updates a second.
 const SPEED: usize = 2;
 /// How long a finished round stays on screen.
 const HOLD: Duration = Duration::from_secs(2);
 
-// Black and white: walls and the path black, open floor white, and the
-// search in greys, with the cells it is about to expand darker.
 const OUTSIDE: Rgba = [0x30, 0x30, 0x30, 0xff];
-const FLOOR: Rgba = [0xff, 0xff, 0xff, 0xff];
+// Walls and both ends are black on either ground. The ends sit clear of
+// walls, so they are the only lone black cells.
 const WALL: Rgba = [0x00, 0x00, 0x00, 0xff];
-const VISITED: Rgba = [0xd4, 0xd4, 0xd4, 0xff];
-const FRONTIER: Rgba = [0x90, 0x90, 0x90, 0xff];
-const PATH: Rgba = [0x00, 0x00, 0x00, 0xff];
 const ENDS: Rgba = [0x00, 0x00, 0x00, 0xff];
 
-/// Breadth-first search across a square grid with blobs of wall, from a
-/// random start to a random goal, in black and white.
-///
-/// The grey visited area shows how the grid measures distance: in open
-/// floor, with four neighbours, it grows as a diamond.
+/// The colours of one ground.
+struct Palette {
+    /// Open floor of each terrain band, cheapest first, before and after
+    /// the search expanded it.
+    floor: [Rgba; BANDS],
+    visited: [Rgba; BANDS],
+    /// Cells the search is about to expand.
+    frontier: Rgba,
+    path: Rgba,
+}
+
+/// Black and white: the path black, open floor white, and the search in
+/// greys, with the cells it is about to expand darker.
+const MAZE: Palette = Palette {
+    floor: [[0xff, 0xff, 0xff, 0xff]; BANDS],
+    visited: [[0xd4, 0xd4, 0xd4, 0xff]; BANDS],
+    frontier: [0x90, 0x90, 0x90, 0xff],
+    path: [0x00, 0x00, 0x00, 0xff],
+};
+
+/// From sand to forest, darker the more a cell costs. Expanded cells are
+/// mixed half and half with blue, the frontier is white, the path red.
+const TERRAIN: Palette = Palette {
+    floor: [
+        [0xf2, 0xe8, 0xc9, 0xff],
+        [0xb7, 0xd3, 0x8f, 0xff],
+        [0x6f, 0x9e, 0x5a, 0xff],
+        [0x3e, 0x5f, 0x3a, 0xff],
+    ],
+    visited: [
+        [0x99, 0xac, 0xcc, 0xff],
+        [0x7b, 0xa1, 0xaf, 0xff],
+        [0x57, 0x87, 0x95, 0xff],
+        [0x3f, 0x67, 0x85, 0xff],
+    ],
+    frontier: [0xff, 0xff, 0xff, 0xff],
+    path: [0xd0, 0x20, 0x20, 0xff],
+};
+
+/// What the search runs on, and so which algorithm and colours it uses.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Ground {
+    /// Even floor, searched breadth first, in black and white. The grey
+    /// visited area shows how the grid measures distance: in open floor,
+    /// with four neighbours, it grows as a diamond.
+    Maze,
+    /// Floor in bands that cost more or less to cross, searched with
+    /// Dijkstra's algorithm. The visited area bulges into cheap ground.
+    Terrain,
+}
+
+impl Ground {
+    fn palette(self) -> &'static Palette {
+        match self {
+            Ground::Maze => &MAZE,
+            Ground::Terrain => &TERRAIN,
+        }
+    }
+}
+
+/// A search across a square grid with blobs of wall, from a random start
+/// to a random goal, on the given [`Ground`].
 pub struct PathSearch {
     round: Round,
     /// Which cell each pixel shows. It only changes with the frame size or
@@ -48,10 +107,10 @@ pub struct PathSearch {
     colors: Vec<Rgba>,
 }
 
-impl Default for PathSearch {
-    fn default() -> Self {
+impl PathSearch {
+    pub fn new(ground: Ground) -> Self {
         Self {
-            round: Round::new(0, board(1.0)),
+            round: Round::new(ground, 0, board(1.0)),
             cells: CellMap::default(),
             colors: Vec::new(),
         }
@@ -60,20 +119,24 @@ impl Default for PathSearch {
 
 impl Scene for PathSearch {
     fn name(&self) -> &'static str {
-        "Path finding"
+        match self.round.ground {
+            Ground::Maze => "Maze (BFS)",
+            Ground::Terrain => "Terrain (Dijkstra)",
+        }
     }
 
     fn fit(&mut self, aspect: f64) {
         // A new shape needs a new board; the round restarts on it.
         let tiling = board(aspect);
         if tiling != self.round.tiling {
-            self.round = Round::new(self.round.number, tiling);
+            self.round = Round::new(self.round.ground, self.round.number, tiling);
         }
     }
 
     fn update(&mut self, step: Duration) {
         if self.round.update(step) {
-            self.round = Round::new(self.round.number + 1, self.round.tiling);
+            let r = &self.round;
+            self.round = Round::new(r.ground, r.number + 1, r.tiling);
         }
     }
 
@@ -109,12 +172,15 @@ fn board(aspect: f64) -> Square {
 
 /// One search on one board, from its first step to the end of its hold.
 struct Round {
+    ground: Ground,
     number: u64,
     tiling: Square,
     start: usize,
     goal: usize,
     walls: Vec<bool>,
-    search: Bfs,
+    /// Terrain band of each cell, an index into COSTS; all 0 on a maze.
+    bands: Vec<usize>,
+    search: Box<dyn Search>,
     /// Cells on the path found, once there is one.
     path: Vec<bool>,
     /// Time left to show the finished round; `None` while searching.
@@ -123,21 +189,32 @@ struct Round {
 
 impl Round {
     /// Returns round number `number` on `tiling`, before its first step.
-    /// Its walls and ends come from a generator seeded with `number`, so
-    /// every round is reproducible.
-    fn new(number: u64, tiling: Square) -> Self {
+    /// Its board comes from a generator seeded with `number`, so every
+    /// round is reproducible.
+    fn new(ground: Ground, number: u64, tiling: Square) -> Self {
         let mut rng = Rng(number);
+        // Walls and ends come first, so both grounds share them for the
+        // same round number and the two searches can be compared.
         let walls = grow_walls(tiling, &mut rng);
         let (start, goal) = ends(tiling, &walls, &mut rng);
         let cells = tiling.cell_count();
+        let (bands, search): (Vec<usize>, Box<dyn Search>) = match ground {
+            Ground::Maze => (vec![0; cells], Box::new(Bfs::new(cells, start, Some(goal)))),
+            Ground::Terrain => (
+                terrain(tiling, &mut rng),
+                Box::new(Dijkstra::new(cells, start, Some(goal))),
+            ),
+        };
         Self {
-            search: Bfs::new(cells, start, Some(goal)),
+            search,
             path: vec![false; cells],
+            ground,
             number,
             tiling,
             start,
             goal,
             walls,
+            bands,
             hold: None,
         }
     }
@@ -152,12 +229,10 @@ impl Round {
             return false;
         }
         for _ in 0..SPEED {
-            // The closure borrows only self.walls, so self.search can be
-            // borrowed mutably at the same time.
-            match self
-                .search
-                .step(&self.tiling, &|c| (!self.walls[c]).then_some(1.0))
-            {
+            // The closure borrows only self.walls and self.bands, so
+            // self.search can be borrowed mutably at the same time.
+            let cost = |c: usize| (!self.walls[c]).then(|| COSTS[self.bands[c]]);
+            match self.search.step(&self.tiling, &cost) {
                 Status::Searching => {}
                 Status::Found => {
                     for cell in self.search.path() {
@@ -176,19 +251,21 @@ impl Round {
     }
 
     fn color(&self, cell: usize) -> Rgba {
+        let palette = self.ground.palette();
         if cell == self.start || cell == self.goal {
             return ENDS;
         }
         if self.path[cell] {
-            return PATH;
+            return palette.path;
         }
         if self.walls[cell] {
             return WALL;
         }
+        let band = self.bands[cell];
         match self.search.mark(cell) {
-            Mark::Unseen => FLOOR,
-            Mark::Frontier => FRONTIER,
-            Mark::Done => VISITED,
+            Mark::Unseen => palette.floor[band],
+            Mark::Frontier => palette.frontier,
+            Mark::Done => palette.visited[band],
         }
     }
 }
@@ -207,9 +284,7 @@ fn grow_walls(tiling: Square, rng: &mut Rng) -> Vec<bool> {
 
     // The cut-off is a quantile, so the share of walls is exact
     // whatever the noise looks like.
-    let mut sorted = height.clone();
-    sorted.sort_by(f64::total_cmp);
-    let cut = sorted[((1.0 - WALLS) * sorted.len() as f64) as usize];
+    let cut = quantile(&height, 1.0 - WALLS);
     let walls: Vec<bool> = height.iter().map(|&h| h >= cut).collect();
 
     // Clear lone specks, walls with at most one wall next to them, so a
@@ -218,6 +293,28 @@ fn grow_walls(tiling: Square, rng: &mut Rng) -> Vec<bool> {
     (0..walls.len())
         .map(|c| walls[c] && wall_neighbours(tiling, &walls, c, &mut next) >= 2)
         .collect()
+}
+
+/// Returns the terrain band of each cell of `tiling`: smooth noise cut at
+/// its quantiles, so each band covers the same share of the board.
+fn terrain(tiling: Square, rng: &mut Rng) -> Vec<usize> {
+    let (cols, rows) = tiling.size();
+    let height = noise::smooth(cols, rows, PATCH, rng);
+    let cuts: Vec<f64> = (1..BANDS)
+        .map(|i| quantile(&height, i as f64 / BANDS as f64))
+        .collect();
+    height
+        .iter()
+        .map(|&h| cuts.iter().filter(|&&cut| h >= cut).count())
+        .collect()
+}
+
+/// Returns the value that a `share` (0 to 1) of `values` lie below.
+fn quantile(values: &[f64], share: f64) -> f64 {
+    let mut sorted = values.to_vec();
+    sorted.sort_by(f64::total_cmp);
+    let i = (share * sorted.len() as f64) as usize;
+    sorted[i.min(sorted.len() - 1)]
 }
 
 /// Returns how many neighbours of `cell` are walls. `scratch` is reused

@@ -16,7 +16,7 @@ use std::rc::Rc;
 use std::time::Duration;
 
 use clock::Clock;
-use scene::{Julia, Lissajous, PathSearch, Plasma, Scene, View};
+use scene::{Ground, Julia, Lissajous, PathSearch, Plasma, Scene, View};
 use wasm_bindgen::prelude::*;
 
 /// Length of one update step: 120 updates per second.
@@ -60,7 +60,8 @@ fn start() -> Result<(), JsValue> {
         Box::new(Plasma::default()),
         Box::new(Julia::default()),
         Box::new(Lissajous::default()),
-        Box::new(PathSearch::default()),
+        Box::new(PathSearch::new(Ground::Maze)),
+        Box::new(PathSearch::new(Ground::Terrain)),
     ];
     let settings = Rc::new(Cell::new(Settings {
         scene: 0,

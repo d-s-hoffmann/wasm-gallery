@@ -15,7 +15,7 @@ mod view;
 
 pub use julia::Julia;
 pub use lissajous::Lissajous;
-pub use path::PathSearch;
+pub use path::{Ground, PathSearch};
 pub use plasma::Plasma;
 pub use view::View;
 
