@@ -15,6 +15,11 @@ impl Square {
     pub fn new(cols: usize, rows: usize, side: f64) -> Self {
         Self { cols, rows, side }
     }
+
+    /// Returns the number of columns and rows.
+    pub fn size(&self) -> (usize, usize) {
+        (self.cols, self.rows)
+    }
 }
 
 impl Tiling for Square {

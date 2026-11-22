@@ -7,6 +7,7 @@ use std::time::Duration;
 
 mod julia;
 mod lissajous;
+mod noise;
 mod palette;
 mod path;
 mod plasma;
