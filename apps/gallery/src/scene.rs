@@ -83,6 +83,12 @@ pub trait Scene {
     /// A short human-readable label, e.g. for a menu entry.
     fn name(&self) -> &'static str;
 
+    /// Tells the scene the shape of the view, width divided by height,
+    /// before each frame's updates. It depends on the window's shape, not
+    /// on the resolution. A scene may use it to lay itself out, e.g. to
+    /// fill the screen; most ignore it.
+    fn fit(&mut self, _aspect: f64) {}
+
     /// Advances the animation by `step`, which the caller keeps constant.
     fn update(&mut self, step: Duration);
 

@@ -5,9 +5,11 @@ use super::{Frame, Scene, View};
 use crate::pathfinding::{Bfs, Mark, Status};
 use crate::tiling::{Square, Tiling};
 
-/// Cells per side of the grid. It must be even; see [`CellMap::fit`].
+/// Cells across the shorter side of the view; the longer side gets as
+/// many as fit. Even, like every side; see [`CellMap::fit`].
 const CELLS: usize = 48;
-/// Side of a cell. The grid spans scene coordinates -1 to 1 on both axes.
+/// Side of a cell. At zoom 1, the view's shorter side spans scene
+/// coordinates -1 to 1, so the board fills the view.
 const SIDE: f64 = 2.0 / CELLS as f64;
 /// Share of cells that are walls.
 const WALLS: f64 = 0.3;
@@ -41,7 +43,7 @@ pub struct PathSearch {
 impl Default for PathSearch {
     fn default() -> Self {
         Self {
-            round: Round::new(0),
+            round: Round::new(0, board(1.0)),
             cells: CellMap::default(),
             colors: Vec::new(),
         }
@@ -53,16 +55,24 @@ impl Scene for PathSearch {
         "Path finding"
     }
 
+    fn fit(&mut self, aspect: f64) {
+        // A new shape needs a new board; the round restarts on it.
+        let tiling = board(aspect);
+        if tiling != self.round.tiling {
+            self.round = Round::new(self.round.number, tiling);
+        }
+    }
+
     fn update(&mut self, step: Duration) {
         if self.round.update(step) {
-            self.round = Round::new(self.round.number + 1);
+            self.round = Round::new(self.round.number + 1, self.round.tiling);
         }
     }
 
     fn render(&mut self, dst: &mut Frame, view: &View) {
         let round = &self.round;
         self.cells
-            .fit(&round.tiling, dst.width(), dst.height(), view);
+            .fit(round.tiling, dst.width(), dst.height(), view);
 
         // Colour each cell once, then each pixel is a lookup: a few
         // thousand cells cost far less than a million pixels.
@@ -74,6 +84,18 @@ impl Scene for PathSearch {
         for (px, &cell) in dst.pixels_mut().iter_mut().zip(&self.cells.cells) {
             *px = self.colors[cell as usize];
         }
+    }
+}
+
+/// Returns the board that fills a view of the given aspect ratio: CELLS
+/// across the shorter side, and as many as fit, rounded down to an even
+/// number, across the longer one.
+fn board(aspect: f64) -> Square {
+    let long = |ratio: f64| ((CELLS as f64 * ratio / 2.0) as usize * 2).max(CELLS);
+    if aspect >= 1.0 {
+        Square::new(long(aspect), CELLS, SIDE)
+    } else {
+        Square::new(CELLS, long(1.0 / aspect), SIDE)
     }
 }
 
@@ -92,11 +114,10 @@ struct Round {
 }
 
 impl Round {
-    /// Returns round number `number`, before its first step. Its walls
-    /// come from a generator seeded with `number`, so every round is
-    /// reproducible.
-    fn new(number: u64) -> Self {
-        let tiling = Square::new(CELLS, CELLS, SIDE);
+    /// Returns round number `number` on `tiling`, before its first step.
+    /// Its walls come from a generator seeded with `number`, so every
+    /// round is reproducible.
+    fn new(number: u64, tiling: Square) -> Self {
         let start = tiling.cell_at((-0.9, 0.0)).expect("start is on the grid");
         let goal = tiling.cell_at((0.9, 0.0)).expect("goal is on the grid");
         let cells = tiling.cell_count();
@@ -173,16 +194,16 @@ impl Round {
 /// shows none.
 #[derive(Default)]
 struct CellMap {
-    /// What the map was built for: frame width, height and view.
-    built_for: Option<(usize, usize, View)>,
+    /// What the map was built for: board, frame width, height and view.
+    built_for: Option<(Square, usize, usize, View)>,
     cells: Vec<u32>,
 }
 
 impl CellMap {
-    /// Rebuilds the map if the frame size or the view changed since the
-    /// last call.
-    fn fit(&mut self, tiling: &Square, width: usize, height: usize, view: &View) {
-        let key = Some((width, height, *view));
+    /// Rebuilds the map if the board, the frame size or the view changed
+    /// since the last call.
+    fn fit(&mut self, tiling: Square, width: usize, height: usize, view: &View) {
+        let key = Some((tiling, width, height, *view));
         if self.built_for == key {
             return;
         }
@@ -192,7 +213,7 @@ impl CellMap {
         // no wall is drawn thinner, thicker or not at all because of
         // where pixel edges happen to fall. Changing the resolution then
         // changes only sharpness. It needs cell edges at multiples of
-        // SIDE from the origin, which holds because CELLS is even.
+        // SIDE from the origin, which holds because both sides are even.
         let map = view.mapping(width, height).snapped(SIDE);
         let outside = tiling.cell_count() as u32;
         self.cells.clear();

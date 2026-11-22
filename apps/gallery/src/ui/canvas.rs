@@ -53,6 +53,18 @@ impl Canvas {
         }
     }
 
+    /// Returns the canvas's displayed width divided by its height, or 1
+    /// while it has no size. Unlike the frame's size, it doesn't depend
+    /// on the pixel budget.
+    pub fn aspect(&self) -> f64 {
+        let (w, h) = (self.canvas.client_width(), self.canvas.client_height());
+        if w > 0 && h > 0 {
+            f64::from(w) / f64::from(h)
+        } else {
+            1.0
+        }
+    }
+
     /// Returns the number of pixels in the current frame.
     pub fn pixels(&self) -> usize {
         self.frame.width() * self.frame.height()
