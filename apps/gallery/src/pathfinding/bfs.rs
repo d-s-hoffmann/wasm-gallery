@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use super::{Mark, Status};
+use super::{Mark, Search, Status, trace};
 use crate::tiling::Tiling;
 
 /// Breadth-first search. It expands cells in order of how many steps they
@@ -36,9 +36,16 @@ impl Bfs {
         }
     }
 
-    /// Expands the oldest frontier cell. It only enters cells for which
-    /// `open` returns true.
-    pub fn step(&mut self, tiling: &impl Tiling, open: impl Fn(usize) -> bool) -> Status {
+    /// Returns the number of steps from the start to `cell`, if reached.
+    pub fn distance(&self, cell: usize) -> Option<u32> {
+        self.reached[cell].map(|(d, _)| d)
+    }
+}
+
+impl Search for Bfs {
+    /// Expands the oldest frontier cell. It ignores what entering a cell
+    /// costs, only whether it can be entered.
+    fn step(&mut self, tiling: &dyn Tiling, cost: &dyn Fn(usize) -> Option<f64>) -> Status {
         let Some(cell) = self.queue.pop_front() else {
             return Status::Unreachable;
         };
@@ -49,8 +56,8 @@ impl Bfs {
         let dist = self.reached[cell].map_or(0, |(d, _)| d);
         self.scratch.clear();
         tiling.neighbours(cell, &mut self.scratch);
-        for &(next, _cost) in &self.scratch {
-            if self.marks[next] == Mark::Unseen && open(next) {
+        for &(next, _length) in &self.scratch {
+            if self.marks[next] == Mark::Unseen && cost(next).is_some() {
                 self.marks[next] = Mark::Frontier;
                 self.reached[next] = Some((dist + 1, cell));
                 self.queue.push_back(next);
@@ -59,29 +66,11 @@ impl Bfs {
         Status::Searching
     }
 
-    pub fn mark(&self, cell: usize) -> Mark {
+    fn mark(&self, cell: usize) -> Mark {
         self.marks[cell]
     }
 
-    /// Returns the number of steps from the start to `cell`, if reached.
-    pub fn distance(&self, cell: usize) -> Option<u32> {
-        self.reached[cell].map(|(d, _)| d)
-    }
-
-    /// Returns the cells of the path found, from the goal back to the
-    /// start, or nothing if the goal hasn't been reached.
-    pub fn path(&self) -> Vec<usize> {
-        let mut path = Vec::new();
-        let Some(mut cell) = self.goal else {
-            return path;
-        };
-        while let Some((_, from)) = self.reached[cell] {
-            path.push(cell);
-            if from == cell {
-                break; // the start
-            }
-            cell = from;
-        }
-        path
+    fn path(&self) -> Vec<usize> {
+        trace(self.goal, |c| self.reached[c].map(|(_, from)| from))
     }
 }

@@ -3,7 +3,7 @@ use std::time::Duration;
 use super::noise::{self, Rng};
 use super::palette::Rgba;
 use super::{Frame, Scene, View};
-use crate::pathfinding::{Bfs, Mark, Status};
+use crate::pathfinding::{Bfs, Mark, Search, Status};
 use crate::tiling::{Square, Tiling};
 
 /// Cells across the shorter side of the view; the longer side gets as
@@ -154,7 +154,10 @@ impl Round {
         for _ in 0..SPEED {
             // The closure borrows only self.walls, so self.search can be
             // borrowed mutably at the same time.
-            match self.search.step(&self.tiling, |c| !self.walls[c]) {
+            match self
+                .search
+                .step(&self.tiling, &|c| (!self.walls[c]).then_some(1.0))
+            {
                 Status::Searching => {}
                 Status::Found => {
                     for cell in self.search.path() {
@@ -252,7 +255,7 @@ fn ends(tiling: Square, walls: &[bool], rng: &mut Rng) -> (usize, usize) {
     for _ in 0..8 {
         let start = open[rng.below(open.len())];
         let mut flood = Bfs::new(cells, start, None);
-        while flood.step(&tiling, |c| !walls[c]) == Status::Searching {}
+        while flood.step(&tiling, &|c| (!walls[c]).then_some(1.0)) == Status::Searching {}
 
         let reached: Vec<(usize, u32)> = (0..cells)
             .filter_map(|c| flood.distance(c).map(|d| (c, d)))
