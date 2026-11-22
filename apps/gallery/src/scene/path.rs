@@ -127,7 +127,7 @@ impl Round {
     /// every round is reproducible.
     fn new(number: u64, tiling: Square) -> Self {
         let mut rng = Rng(number);
-        let walls = walls(tiling, &mut rng);
+        let walls = grow_walls(tiling, &mut rng);
         let (start, goal) = ends(tiling, &walls, &mut rng);
         let cells = tiling.cell_count();
         Self {
@@ -144,9 +144,9 @@ impl Round {
 
     /// Advances the round by `step`; returns true once it is over.
     fn update(&mut self, step: Duration) -> bool {
-        if let Some(left) = self.hold {
-            match left.checked_sub(step) {
-                Some(left) if !left.is_zero() => self.hold = Some(left),
+        if let Some(remaining) = self.hold {
+            match remaining.checked_sub(step) {
+                Some(rest) if !rest.is_zero() => self.hold = Some(rest),
                 _ => return true,
             }
             return false;
@@ -192,7 +192,7 @@ impl Round {
 
 /// Returns which cells of `tiling` are walls: the highest WALLS share of
 /// smooth noise, so walls come in blobs.
-fn walls(tiling: Square, rng: &mut Rng) -> Vec<bool> {
+fn grow_walls(tiling: Square, rng: &mut Rng) -> Vec<bool> {
     let (cols, rows) = tiling.size();
     let blobs = noise::smooth(cols, rows, BLOB, rng);
     let detail = noise::smooth(cols, rows, DETAIL, rng);
