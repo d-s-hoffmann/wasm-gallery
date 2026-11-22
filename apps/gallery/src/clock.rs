@@ -1,7 +1,8 @@
-//! Fixed-step timing for the animation loop.
+//! Timing for the animation loop: fixed update steps, and a pixel budget
+//! that follows how long frames take.
 //!
-//! Plain Rust with no browser API: it only turns frame timestamps into a
-//! number of update steps.
+//! Plain Rust with no browser API: it only turns measured times into
+//! decisions.
 
 use std::time::Duration;
 
@@ -48,5 +49,45 @@ impl Clock {
             steps += 1;
         }
         steps
+    }
+}
+
+/// Picks a pixel budget so that a frame takes about `target` to compute.
+///
+/// From the last frame it estimates the cost of one pixel, and moves the
+/// budget halfway towards what fits. It ignores differences under 20 %,
+/// so the canvas isn't resized on every small change in timing.
+pub struct Governor {
+    target: Duration,
+    min: usize,
+    budget: usize,
+}
+
+impl Governor {
+    /// Returns a governor that starts at `budget` pixels and never goes
+    /// below `min`.
+    pub fn new(target: Duration, min: usize, budget: usize) -> Self {
+        Self {
+            target,
+            min,
+            budget,
+        }
+    }
+
+    /// Records that the last frame took `work` for `pixels` pixels, and
+    /// returns the budget for the next frame, at most `limit`.
+    pub fn adjust(&mut self, work: Duration, pixels: usize, limit: usize) -> usize {
+        if pixels > 0 {
+            // Browsers round their timer to as much as 1 ms, so a fast
+            // frame can measure as 0; count it as half a millisecond.
+            let work = work.max(Duration::from_micros(500)).as_secs_f64();
+            let fits = self.target.as_secs_f64() / work * pixels as f64;
+            let now = self.budget as f64;
+            if (fits - now).abs() > now * 0.2 {
+                self.budget = ((now + fits) / 2.0) as usize;
+            }
+        }
+        self.budget = self.budget.clamp(self.min, limit.max(self.min));
+        self.budget
     }
 }

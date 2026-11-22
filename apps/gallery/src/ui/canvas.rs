@@ -53,6 +53,11 @@ impl Canvas {
         }
     }
 
+    /// Returns the number of pixels in the current frame.
+    pub fn pixels(&self) -> usize {
+        self.frame.width() * self.frame.height()
+    }
+
     /// Returns the frame to draw the next picture into.
     pub fn frame_mut(&mut self) -> &mut Frame {
         &mut self.frame
