@@ -3,6 +3,7 @@ use super::Tiling;
 /// A grid of `cols` × `rows` square cells, centred on the origin and
 /// numbered row by row from the top left. A cell's neighbours are the
 /// four cells it shares an edge with.
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Square {
     cols: usize,
     rows: usize,
@@ -13,6 +14,11 @@ pub struct Square {
 impl Square {
     pub fn new(cols: usize, rows: usize, side: f64) -> Self {
         Self { cols, rows, side }
+    }
+
+    /// Returns the number of columns and rows.
+    pub fn size(&self) -> (usize, usize) {
+        (self.cols, self.rows)
     }
 }
 

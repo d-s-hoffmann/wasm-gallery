@@ -23,7 +23,8 @@ pub enum Mark {
 pub enum Status {
     Searching,
     Found,
-    /// The frontier ran out before the goal was reached.
+    /// The frontier ran out before the goal was reached, or, without a
+    /// goal, every reachable cell has been expanded.
     Unreachable,
 }
 
@@ -31,7 +32,8 @@ pub enum Status {
 /// are from the start, so the path it finds has the fewest steps. It
 /// ignores step costs.
 pub struct Bfs {
-    goal: usize,
+    /// The cell to stop at; `None` explores everything reachable.
+    goal: Option<usize>,
     /// Reached cells waiting to be expanded, oldest first.
     queue: VecDeque<usize>,
     marks: Vec<Mark>,
@@ -44,7 +46,8 @@ pub struct Bfs {
 
 impl Bfs {
     /// Starts a search from `start` to `goal` on a tiling of `cells` cells.
-    pub fn new(cells: usize, start: usize, goal: usize) -> Self {
+    /// Without a goal, it runs until it has reached every cell it can.
+    pub fn new(cells: usize, start: usize, goal: Option<usize>) -> Self {
         let mut marks = vec![Mark::Unseen; cells];
         let mut reached = vec![None; cells];
         marks[start] = Mark::Frontier;
@@ -65,7 +68,7 @@ impl Bfs {
             return Status::Unreachable;
         };
         self.marks[cell] = Mark::Done;
-        if cell == self.goal {
+        if Some(cell) == self.goal {
             return Status::Found;
         }
         let dist = self.reached[cell].map_or(0, |(d, _)| d);
@@ -94,7 +97,9 @@ impl Bfs {
     /// start, or nothing if the goal hasn't been reached.
     pub fn path(&self) -> Vec<usize> {
         let mut path = Vec::new();
-        let mut cell = self.goal;
+        let Some(mut cell) = self.goal else {
+            return path;
+        };
         while let Some((_, from)) = self.reached[cell] {
             path.push(cell);
             if from == cell {

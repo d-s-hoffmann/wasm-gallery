@@ -105,6 +105,7 @@ fn start() -> Result<(), JsValue> {
     ui::animate(move |tick| {
         let s = settings.get();
         let scene = &mut scenes[s.scene];
+        scene.fit(canvas.aspect());
         for _ in 0..clock.advance(tick.now) {
             scene.update(STEP);
         }
